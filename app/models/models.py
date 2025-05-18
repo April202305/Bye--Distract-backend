@@ -18,7 +18,9 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
     study_room_id = Column(Integer, ForeignKey('study_rooms.room_id'), nullable=True)
-    
+    reference_expression1 = Column(String(50))  # 默认空字符串
+    reference_expression2 = Column(String(50)) # 默认空字符串
+    avatar_url = Column(String(255), nullable=True)  # 允许为空，初始值可以是 None
     # 明确指定外键关系
     study_rooms = relationship("StudyRoom", 
                              back_populates="creator",
@@ -64,6 +66,8 @@ class Task(Base):
     )
     build_time = Column(DateTime, server_default=func.now())
     given_up = Column(Boolean, server_default=text('false'))
+    focus = Column(Boolean, server_default=text('false'))
+    focus_ratio = Column(Float, default=0.0)  # 专注比率（0-1）
     finish_time = Column(DateTime, server_default=func.now())
 
     # 与 User 模型的关ms联
@@ -94,4 +98,5 @@ class DailyStatistics(Base):
     task_breakdown = Column(JSON)                 # 任务时间分布
     
     user = relationship("User", back_populates="daily_stats")
+
 

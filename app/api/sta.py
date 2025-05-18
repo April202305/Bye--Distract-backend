@@ -37,6 +37,24 @@ async def get_user_stats(
         DailyStatistics.user_id == user_id,
         DailyStatistics.date == date.today()
     ).first()
+    # 获取今日完成的任务列表
+    today_tasks = db.query(Task).filter(
+        Task.user_id == user_id,
+        func.date(Task.finish_time) == date.today(),
+        Task.is_finished == True
+    ).all()
+    
+    # 构建任务统计数据
+    task_stats = []
+    for task in today_tasks:
+        if task.focus_ratio is not None:
+            focused_time = task.time * task.focus_ratio/100 if task.focus_ratio else 0
+            task_stats.append({
+            "title": task.title,
+            "total_time": task.time,
+            "focus_ratio": task.focus_ratio/100 or 0.0,
+            "focused_time": round(focused_time, 2)
+            })    
     
     
     return {
@@ -45,6 +63,7 @@ async def get_user_stats(
             "total_duration": stats.total_duration,
             "average_daily_duration": avg_duration
         },
-        "today": daily
+        "today": daily,
+        "tasks": task_stats
     }
 

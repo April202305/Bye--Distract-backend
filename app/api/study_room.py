@@ -9,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy import func
 from datetime import date
 from app.models.models import User, StudyRoom, DailyStatistics
-
+from fastapi import status  # 推荐直接从 FastAPI 导入
 
 router = APIRouter(prefix="/study_room", tags=["study_room"])
 
@@ -27,7 +27,15 @@ async def create_task(
 ):
     # 验证用户存在
     validate_user_exists(db, room_data.user_id)
-
+    # 检查用户是否已加入其他自习室
+    target_user = db.query(User).filter(
+        User.user_id == room_data.user_id
+    ).first()
+    if target_user.study_room_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="用户已加入其他自习室，请先退出后再创建新房间"
+        )
     # 创建任务
     new_study_room = StudyRoom(
         creator_id=room_data.user_id,
