@@ -23,11 +23,16 @@ from fastapi.responses import JSONResponse
 import asyncio
 from fastapi import FastAPI, UploadFile, File
 
+try:
+    from oss_config import *
+except ImportError:
+    raise Exception("请复制oss_config.example.py为oss_config.py并填写配置")
+
 # OSS配置
-OSS_ACCESS_KEY_ID = "REMOVED"
-OSS_ACCESS_KEY_SECRET = "REMOVED"
-OSS_ENDPOINT = "oss-cn-shenzhen.aliyuncs.com"
-OSS_BUCKET_NAME = "ai-face-reg"
+# OSS_ACCESS_KEY_ID = "REMOVED"
+# OSS_ACCESS_KEY_SECRET = "REMOVED"
+# OSS_ENDPOINT = "oss-cn-shenzhen.aliyuncs.com"
+# OSS_BUCKET_NAME = "ai-face-reg"
 
 # 初始化 OSS 客户端
 def get_oss_client():
@@ -145,18 +150,6 @@ async def upload_photo(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="用户不存在"
                 )
-            
-            # 如果用户已有头像，先删除旧头像
-            if user.avatar_url:
-                try:
-                    # 从URL中提取对象名称
-                    old_object_name = user.avatar_url.split(f"{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/")[-1]
-                    # 删除OSS中的旧文件
-                    auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
-                    bucket = oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
-                    bucket.delete_object(old_object_name)
-                except Exception as e:
-                    print(f"删除旧头像失败: {str(e)}")  # 记录错误但继续执行
         
         # 生成唯一的对象名称
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -178,7 +171,7 @@ async def upload_photo(
             content={
                 "status": "success",
                 "message": "照片上传成功",
-                "user_id": user_id,
+                "user_id":user_id,
                 "photo_url": photo_url
             }
         )
@@ -198,108 +191,53 @@ async def upload_photo(
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
 
-# @router.delete("/{user_id}")
-# async def delete_photo(
-#     user_id: int,
-#     db: Session = Depends(get_db)
-# ):
-#     """删除用户照片"""
-#     try:
-#         user = db.query(User).filter(User.user_id == user_id).first()
-#         if not user:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND,
-#                 detail="用户不存在"
-#             )
-        
-#         if not user.avatar_url:
-#             raise HTTPException(
-#                 status_code=status.HTTP_400_BAD_REQUEST,
-#                 detail="用户没有上传照片"
-#             )
-        
-#         # 从URL中提取对象名称
-#         object_name = user.avatar_url.split(f"{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/")[-1]
-        
-#         # 删除OSS中的文件
-#         auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
-#         bucket = oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
-#         bucket.delete_object(object_name)
-        
-#         # 更新用户头像URL
-#         user.avatar_url = None
-#         db.commit()
-        
-#         return JSONResponse(
-#             status_code=status.HTTP_200_OK,
-#             content={
-#                 "status": "success",
-#                 "message": "照片删除成功"
-#             }
-#         )
-        
-#     except HTTPException as he:
-#         raise he
-#     except Exception as e:
-#         return JSONResponse(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             content={
-#                 "status": "error",
-#                 "message": f"删除失败: {str(e)}"
-#             }
-#         )
-
-@router.post("/")
-async def get_user_avatars(
-    user_ids: str,  # 接收逗号分隔的用户ID字符串
+@router.delete("/{user_id}")
+async def delete_photo(
+    user_id: int,
     db: Session = Depends(get_db)
 ):
-    """批量获取用户头像URL
-    
-    Args:
-        user_ids: 逗号分隔的用户ID字符串，例如 "1,2,3"
-    """
+    """删除用户照片"""
     try:
-        # 将字符串转换为整数列表
-        id_list = [int(id_str.strip()) for id_str in user_ids.split(',') if id_str.strip()]
-        
-        if not id_list:
+        user = db.query(User).filter(User.user_id == user_id).first()
+        if not user:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="请提供有效的用户ID列表"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
             )
         
-        # 查询用户头像URL
-        users = db.query(User).filter(
-            User.user_id.in_(id_list)
-        ).all()
+        if not user.avatar_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户没有上传照片"
+            )
         
-        # 构建响应数据
-        avatar_dict = {user.user_id: user.avatar_url for user in users}
+        # 从URL中提取对象名称
+        object_name = user.avatar_url.split(f"{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/")[-1]
         
-        # 确保返回所有请求的用户ID，没有头像的返回null
-        result = {
-            str(user_id): avatar_dict.get(user_id) for user_id in id_list
-        }
+        # 删除OSS中的文件
+        auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
+        bucket = oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
+        bucket.delete_object(object_name)
+        
+        # 更新用户头像URL
+        user.avatar_url = None
+        db.commit()
         
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
                 "status": "success",
-                "data": result
+                "message": "照片删除成功"
             }
         )
         
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="用户ID格式不正确"
-        )
+    except HTTPException as he:
+        raise he
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "status": "error",
-                "message": f"获取头像失败: {str(e)}"
+                "message": f"删除失败: {str(e)}"
             }
-        ) 
+        )

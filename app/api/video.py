@@ -16,11 +16,16 @@ from fastapi.responses import JSONResponse
 from fastapi import FastAPI, UploadFile, File
 from app.api.users import get_db
 
-# OSS配置
-OSS_ACCESS_KEY_ID = "REMOVED"
-OSS_ACCESS_KEY_SECRET = "REMOVED"
-OSS_ENDPOINT = "oss-cn-shenzhen.aliyuncs.com"
-OSS_BUCKET_NAME = "ai-face-reg"
+try:
+    from oss_config import *
+except ImportError:
+    raise Exception("请复制oss_config.example.py为oss_config.py并填写配置")
+
+# # OSS配置
+# OSS_ACCESS_KEY_ID = "REMOVED"
+# OSS_ACCESS_KEY_SECRET = "REMOVED"
+# OSS_ENDPOINT = "oss-cn-shenzhen.aliyuncs.com"
+# OSS_BUCKET_NAME = "ai-face-reg"
 
 # 分片大小（5MB）
 CHUNK_SIZE = 5 * 1024 * 1024
