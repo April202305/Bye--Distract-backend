@@ -28,12 +28,6 @@ try:
 except ImportError:
     raise Exception("请复制oss_config.example.py为oss_config.py并填写配置")
 
-# OSS配置
-# OSS_ACCESS_KEY_ID = "REMOVED"
-# OSS_ACCESS_KEY_SECRET = "REMOVED"
-# OSS_ENDPOINT = "oss-cn-shenzhen.aliyuncs.com"
-# OSS_BUCKET_NAME = "ai-face-reg"
-
 # 初始化 OSS 客户端
 def get_oss_client():
     auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
