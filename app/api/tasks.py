@@ -18,7 +18,7 @@ async def get_user_tasks(
     user_id: int,
     db: Session = Depends(get_db)
 ):
-    """获取用户所有任务"""
+    """Get all tasks for a user"""
     tasks = db.query(Task).filter(
         Task.user_id == user_id,
         Task.is_finished == False
@@ -28,10 +28,10 @@ async def get_user_tasks(
     return tasks
 
 def validate_user_exists(db: Session, user_id: int):
-    """验证用户是否存在"""
+    """Validate if user exists"""
     user = db.query(User).get(user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
+        raise HTTPException(status_code=404, detail="User not found")
     return user
 
 @router.post("/add", response_model=TaskResponse)
@@ -39,12 +39,12 @@ async def create_task(
     task_data: TaskCreate,
     db: Session = Depends(get_db)
 ):
-    # 验证用户存在
+    # Validate user exists
     validate_user_exists(db, task_data.user_id)
     
     
 
-    # 创建任务
+    # Create task
     new_task = Task(
         user_id=task_data.user_id,
         expected_mode=task_data.expected_mode,
@@ -58,10 +58,10 @@ async def create_task(
     return new_task
 
 def validate_task_exists(db: Session, task_id: int):
-    """验证用户是否存在"""
+    """Validate if task exists"""
     task_id = db.query(Task).get(task_id)
     if not task_id:
-        raise HTTPException(status_code=404, detail="用户不存在")
+        raise HTTPException(status_code=404, detail="Task not found")
     return task_id
 
 
@@ -71,13 +71,13 @@ async def modify_task(
     task_data: Taskmodify,
     db: Session = Depends(get_db)
 ):
-    # 验证任务存在
+    # Validate task exists
     validate_task_exists(db, task_data.task_id)
     
-    # 获取要修改的任务对象
+    # Get task object to modify
     db_task = db.query(Task).filter(Task.task_id == task_data.task_id).first()
     
-    # 更新任务字段（排除task_id自身）
+    # Update task fields (excluding task_id itself)
     if task_data.expected_mode is not None:
         db_task.expected_mode = task_data.expected_mode
     if task_data.title is not None:
@@ -89,31 +89,31 @@ async def modify_task(
     db.refresh(db_task)
     return db_task
 
-@router.post("/del", response_model=BaseResponse)  # 建议修改响应模型为通用响应
+@router.post("/del", response_model=BaseResponse)
 async def delete_task(
     task_data: Taskdel,
     db: Session = Depends(get_db)
 ):
-    # 验证任务存在
+    # Validate task exists
     validate_task_exists(db, task_data.task_id)
     
-    # 获取要删除的任务对象
+    # Get task object to delete
     db_task = db.query(Task).filter(Task.task_id == task_data.task_id).first()
     
-    # 执行删除操作
+    # Execute delete operation
     db.delete(db_task)
-    db.commit()  # 确保立即提交删除操作
+    db.commit()  # Ensure immediate commit of delete operation
     
-    # 再次验证任务是否已被删除
+    # Verify task has been deleted
     deleted_task = db.query(Task).filter(Task.task_id == task_data.task_id).first()
     
     if deleted_task:
-        raise HTTPException(status_code=500, detail="删除任务失败")
+        raise HTTPException(status_code=500, detail="Failed to delete task")
     
-    # 返回成功响应（需要与BaseResponse模型匹配）
+    # Return success response (needs to match BaseResponse model)
     return BaseResponse(
         code=200,
-        message="删除成功",
+        message="Delete successful",
         data=None
     )
 @router.post("/finish", response_model=TaskResponse)
@@ -121,10 +121,10 @@ async def modify_task(
     task_data: Taskfinished,
     db: Session = Depends(get_db)
 ):
-    # 验证任务存在
+    # Validate task exists
     validate_task_exists(db, task_data.task_id)
     
-    # 获取要修改的任务对象
+    # Get task object to modify
     db_task = db.query(Task).filter(Task.task_id == task_data.task_id).first()
     
     if task_data.time is not None:
@@ -133,8 +133,8 @@ async def modify_task(
     db_task.finish_time = datetime.now()
     db_task.given_up = task_data.given_up   
 
-    # 更新统计数据
-    # 1. 更新总统计
+    # Update statistics
+    # 1. Update total statistics
     stats = db.query(StudyStatistics).filter(
         StudyStatistics.user_id == db_task.user_id
     ).first()
@@ -149,7 +149,7 @@ async def modify_task(
         stats.total_duration += db_task.time
         stats.last_updated = date.today()
     
-    #2. 更新每日统计
+    # 2. Update daily statistics
     today = date.today()
     daily = db.query(DailyStatistics).filter(
         DailyStatistics.user_id == db_task.user_id,
@@ -172,10 +172,10 @@ async def modify_task(
         daily.frequency_day += 1
         daily.duration_day += db_task.time
         
-        # 先提交当前任务的更新
+        # Commit current task update first
         db.commit()
         
-        # 获取当天所有有效任务（包含刚刚更新的这个任务）
+        # Get all valid tasks for today (including the one just updated)
         finished_tasks = db.query(Task).filter(
             Task.user_id == db_task.user_id,
             func.date(Task.finish_time) == today,
@@ -185,13 +185,13 @@ async def modify_task(
         
         total_duration = sum(task.time for task in finished_tasks)
         
-        # 合并同名任务时间
+        # Merge time for tasks with same name
         from collections import defaultdict
         duration_by_title = defaultdict(int)
         for task in finished_tasks:
             duration_by_title[task.title] += task.time
 
-        # 生成新的分配比例
+        # Generate new distribution ratio
         new_breakdown = {}
         if total_duration > 0:
             new_breakdown = {
@@ -199,7 +199,7 @@ async def modify_task(
                 for title, duration in duration_by_title.items()
             }
         
-        # 更新每日统计
+        # Update daily statistics
         daily.task_breakdown = new_breakdown                        
     else:
        daily.given_up_day+=1   

@@ -5,7 +5,7 @@ from collections import defaultdict, Counter
 def analyze_video_emotions(input_video):
     cap = cv2.VideoCapture(input_video)
 
-    # 获取视频参数（不打印）
+    # Get video parameters (no print)
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
@@ -19,7 +19,7 @@ def analyze_video_emotions(input_video):
 
         current_second = frame_counter // fps
 
-        # 每秒处理一次（选择每秒最后一帧）
+        # Process once per second (select last frame of each second)
         if frame_counter % fps == fps - 1:
             try:
                 analysis = DeepFace.analyze(
@@ -37,7 +37,7 @@ def analyze_video_emotions(input_video):
 
     cap.release()
 
-    # 全局统计（不打印）
+    # Global statistics (no print)
     emotion_counter = Counter()
     for second in results.keys():
         valid_emotions = [
@@ -47,17 +47,17 @@ def analyze_video_emotions(input_video):
         ]
         emotion_counter.update(valid_emotions)
 
-    # 获取出现次数最多的两个情绪（仅名称）
+    # Get the top two emotions (only names)
     most_common_emotions = [emotion for emotion, _ in emotion_counter.most_common(2)]
 
-    # 如果不足两个结果，补空字符串
+    # If there are fewer than two results, add empty strings
     most_common_emotions += [''] * (2 - len(most_common_emotions))
-    return most_common_emotions[:2]  # 确保返回两个值
+    return most_common_emotions[:2]  # Ensure two values are returned
 
-# # 示例调用
+# # Example call
 # if __name__ == "__main__":
 #     video_path = '1.mp4'
 #     top_emotions = analyze_video_emotions(video_path)
-#     print("\n==== 视频中的主要情绪 ====")
+#     print("\n==== Video main emotions ====")
 #     for emotion, count in top_emotions:
-#         print(f"{emotion}: {count} 次")
+#         print(f"{emotion}: {count} times")

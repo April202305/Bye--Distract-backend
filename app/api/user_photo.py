@@ -1,7 +1,7 @@
 from fastapi import UploadFile, HTTPException
 from datetime import datetime
 import os
-# 使用 Pillow 库处理图片
+# Use Pillow library for image processing
 from PIL import Image
 import io
 from alibabacloud_oss_v2.client import Client
@@ -26,35 +26,35 @@ from fastapi import FastAPI, UploadFile, File
 try:
     from oss_config import *
 except ImportError:
-    raise Exception("请复制oss_config.example.py为oss_config.py并填写配置")
+    raise Exception("Please copy oss_config.example.py to oss_config.py and fill in the configuration")
 
-# 初始化 OSS 客户端
+# Initialize OSS client
 def get_oss_client():
     auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
     return oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
 
-# 分片大小（1MB，照片文件较小）
+# Chunk size (1MB, photos are relatively small)
 CHUNK_SIZE = 1 * 1024 * 1024
 
 async def upload_avatar(user_id: int, file: UploadFile):
-    # 验证文件类型
+    # Validate file type
     allowed_types = ["image/jpeg", "image/png", "image/webp"]
     if file.content_type not in allowed_types:
-        raise HTTPException(400, "仅支持 JPEG/PNG/WEBP 格式")
+        raise HTTPException(400, "Only JPEG/PNG/WEBP formats are supported")
     
-    # 验证文件大小（例如最大 5MB）
+    # Validate file size (e.g., max 5MB)
     max_size = 5 * 1024 * 1024  # 5MB
-    file.file.seek(0, 2)  # 移动指针到文件末尾
+    file.file.seek(0, 2)  # Move pointer to end of file
     file_size = file.file.tell()
-    file.file.seek(0)  # 重置指针
+    file.file.seek(0)  # Reset pointer
     if file_size > max_size:
-        raise HTTPException(400, "文件大小超过限制")
+        raise HTTPException(400, "File size exceeds limit")
 
 
 def generate_avatar_name(user_id: int, filename: str) -> str:
-    # 提取文件后缀（如 .jpg）
+    # Extract file extension (e.g., .jpg)
     ext = os.path.splitext(filename)[1]
-    # 生成唯一名称（示例：avatars/123/20231010_153045_abc123.jpg）
+    # Generate unique name (example: avatars/123/20231010_153045_abc123.jpg)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = 123456
     return f"avatars/{user_id}/{timestamp}_{unique_id}{ext}"   
@@ -78,12 +78,12 @@ async def delete_old_avatar(old_url: str):
 def update_user_avatar(db: Session, user_id: int, avatar_url: str):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(404, "用户不存在")
+        raise HTTPException(404, "User not found")
     user.avatar_url = avatar_url
     db.commit()
 
 async def save_temp_photo(photo: UploadFile) -> str:
-    """保存上传的照片到临时文件"""
+    """Save uploaded photo to temporary file"""
     temp_dir = tempfile.gettempdir()
     temp_path = os.path.join(temp_dir, f"{photo.filename}")
     
@@ -94,19 +94,17 @@ async def save_temp_photo(photo: UploadFile) -> str:
     return temp_path
 
 async def upload_to_oss(file_path: str, object_name: str) -> str:
-    """使用简单上传将文件上传到OSS"""
     auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
     bucket = oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
     
     try:
-        # 直接使用简单上传
         bucket.put_object_from_file(object_name, file_path)
         return f"https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/{object_name}"
         
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"上传失败: {str(e)}"
+            detail=f"upload error: {str(e)}"
         )
 
 router = APIRouter(prefix="/photos", tags=["photos"])
@@ -120,14 +118,14 @@ async def upload_photo(
     """上传用户照片"""
     temp_path = None
     try:
-        # 验证文件类型
+        # Validate file type
         if not photo.content_type.startswith('image/'):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="只支持图片文件上传"
             )
         
-        # 验证文件大小（限制为5MB）
+        # Validate file size (限制为5MB)
         content = await photo.read()
         if len(content) > 5 * 1024 * 1024:
             raise HTTPException(
@@ -136,7 +134,7 @@ async def upload_photo(
             )
         await photo.seek(0)  # 重置文件指针
         
-        # 检查用户是否存在
+        # Check if user exists
         if user_id:
             user = db.query(User).filter(User.user_id == user_id).first()
             if not user:
@@ -145,17 +143,17 @@ async def upload_photo(
                     detail="用户不存在"
                 )
         
-        # 生成唯一的对象名称
+        # Generate unique object name
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         object_name = f"photos/{user_id or 'public'}/{timestamp}_{photo.filename}"
         
-        # 保存到临时文件
+        # Save to temporary file
         temp_path = await save_temp_photo(photo)
         
-        # 上传到OSS
+        # Upload to OSS
         photo_url = await upload_to_oss(temp_path, object_name)
         
-        # 如果指定了用户，更新用户头像
+        # If specified user, update user avatar
         if user_id:
             user.avatar_url = photo_url
             db.commit()
@@ -164,7 +162,7 @@ async def upload_photo(
             status_code=status.HTTP_200_OK,
             content={
                 "status": "success",
-                "message": "照片上传成功",
+                "message": "Photo uploaded successfully",
                 "user_id":user_id,
                 "photo_url": photo_url
             }
@@ -177,11 +175,11 @@ async def upload_photo(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "status": "error",
-                "message": f"处理失败: {str(e)}"
+                "message": f"Processing failed: {str(e)}"
             }
         )
     finally:
-        # 清理临时文件
+        # Clean up temporary file
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
 
@@ -196,24 +194,24 @@ async def delete_photo(
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="用户不存在"
+                detail="user not found"
             )
         
         if not user.avatar_url:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="用户没有上传照片"
+                detail="user not has photo"
             )
         
-        # 从URL中提取对象名称
+        # Extract object name from URL
         object_name = user.avatar_url.split(f"{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/")[-1]
         
-        # 删除OSS中的文件
+        # Delete file from OSS
         auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
         bucket = oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
         bucket.delete_object(object_name)
         
-        # 更新用户头像URL
+        # Update user avatar URL
         user.avatar_url = None
         db.commit()
         
@@ -221,7 +219,7 @@ async def delete_photo(
             status_code=status.HTTP_200_OK,
             content={
                 "status": "success",
-                "message": "照片删除成功"
+                "message": "Photo deleted successfully"
             }
         )
         
@@ -232,6 +230,6 @@ async def delete_photo(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "status": "error",
-                "message": f"删除失败: {str(e)}"
+                "message": f"Delete failed: {str(e)}"
             }
         )

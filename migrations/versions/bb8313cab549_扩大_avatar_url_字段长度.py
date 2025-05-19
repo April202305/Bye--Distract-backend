@@ -1,4 +1,4 @@
-"""扩大 avatar_url 字段长度
+"""Increase avatar_url field length
 
 Revision ID: bb8313cab549
 Revises: 82fe1adbe135

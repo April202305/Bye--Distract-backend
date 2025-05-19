@@ -9,15 +9,15 @@ from sqlalchemy import text
 from sqlalchemy import func
 from datetime import date
 from app.models.models import User, StudyRoom, DailyStatistics
-from fastapi import status  # 推荐直接从 FastAPI 导入
+from fastapi import status
 
 router = APIRouter(prefix="/study_room", tags=["study_room"])
 
 def validate_user_exists(db: Session, user_id: int):
-    """验证用户是否存在"""
+    """Validate if user exists"""
     user = db.query(User).get(user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
+        raise HTTPException(status_code=404, detail="User not found")
     return user
 
 @router.post("/add", response_model=RoomResponse)
@@ -25,18 +25,18 @@ async def create_task(
     room_data: StudyRoomCreate,
     db: Session = Depends(get_db)
 ):
-    # 验证用户存在
+    # Validate user exists
     validate_user_exists(db, room_data.user_id)
-    # 检查用户是否已加入其他自习室
+    # Check if user has already joined another study room
     target_user = db.query(User).filter(
         User.user_id == room_data.user_id
     ).first()
     if target_user.study_room_id is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="用户已加入其他自习室，请先退出后再创建新房间"
+            detail="User has already joined another study room, please leave first before creating a new room"
         )
-    # 创建任务
+    # Create study room
     new_study_room = StudyRoom(
         creator_id=room_data.user_id,
         room_name=room_data.room_name,
@@ -44,10 +44,9 @@ async def create_task(
         members_list=[room_data.user_id]
     )
     
-
     db.add(new_study_room)
     db.commit()
-        # 更新用户的study_room_id
+    # Update user's study_room_id
     db.query(User).filter(
         User.user_id == new_study_room.creator_id
     ).update({
@@ -57,35 +56,33 @@ async def create_task(
     db.refresh(new_study_room)
     return new_study_room
 
-
-
 @router.post("/join", response_model=RoomResponse)
 async def join_study_room(
     join_data: StudyRoomJoin,
     db: Session = Depends(get_db)
 ):
-    # 验证用户存在
+    # Validate user exists
     validate_user_exists(db, join_data.user_id)
     
-    # 1. 查询目标自习室
+    # 1. Query target study room
     target_room = db.query(StudyRoom).filter(
         StudyRoom.room_id == join_data.room_id
     ).first()
     
     if not target_room:
-        raise HTTPException(status_code=404, detail="自习室不存在")
+        raise HTTPException(status_code=404, detail="Study room not found")
     
-    # 2. 检查是否已经加入
+    # 2. Check if already joined
     if join_data.user_id in (target_room.members_list or []):
-        raise HTTPException(status_code=400, detail="用户已在该自习室")
+        raise HTTPException(status_code=400, detail="User already in this study room")
     
     try:
-        # 3. 更新成员列表和数量
-        # 处理空列表的情况
+        # 3. Update member list and count
+        # Handle empty list case
         new_members = target_room.members_list or []
         new_members.append(join_data.user_id)
         
-        # 使用SQLAlchemy的更新方式确保原子操作
+        # Use SQLAlchemy update to ensure atomic operation
         db.query(StudyRoom).filter(
             StudyRoom.room_id == join_data.room_id
         ).update({
@@ -93,7 +90,7 @@ async def join_study_room(
             "members_list": new_members
         })
         
-        # 更新用户的study_room_id
+        # Update user's study_room_id
         db.query(User).filter(
             User.user_id == join_data.user_id
         ).update({
@@ -102,7 +99,7 @@ async def join_study_room(
         
         db.commit()
         
-        # 4. 刷新获取最新数据
+        # 4. Refresh to get latest data
         db.refresh(target_room)
         return target_room
         
@@ -110,7 +107,7 @@ async def join_study_room(
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"加入自习室失败: {str(e)}"
+            detail=f"Failed to join study room: {str(e)}"
         )
 
 @router.post("/leave")
@@ -118,39 +115,39 @@ async def leave_study_room(
     leave_data: StudyRoomLeave,
     db: Session = Depends(get_db)
 ):
-    # 验证用户存在
+    # Validate user exists
     validate_user_exists(db, leave_data.user_id)
     
-    # 1. 查询目标自习室
+    # 1. Query target study room
     target_room = db.query(StudyRoom).filter(
         StudyRoom.room_id == leave_data.room_id
     ).first()
     
     if not target_room:
-        raise HTTPException(status_code=404, detail="自习室不存在")
+        raise HTTPException(status_code=404, detail="Study room not found")
     
-    # 2. 检查用户是否在自习室中
+    # 2. Check if user is in the study room
     if not target_room.members_list or leave_data.user_id not in target_room.members_list:
-        raise HTTPException(status_code=400, detail="用户不在该自习室")
+        raise HTTPException(status_code=400, detail="User not in this study room")
     
     try:
-        # 3. 更新成员列表和数量
+        # 3. Update member list and count
         new_members = [m for m in target_room.members_list if m != leave_data.user_id]
         
-        # 更新用户的study_room_id为None
+        # Update user's study_room_id to None
         db.query(User).filter(
             User.user_id == leave_data.user_id
         ).update({
             "study_room_id": None
         })
         
-        # 如果自习室空了，删除自习室
+        # If study room is empty, delete it
         if not new_members:
             db.delete(target_room)
             db.commit()
-            return {"message": "自习室已删除"}
+            return {"message": "Study room deleted"}
         
-        # 否则更新成员列表
+        # Otherwise update member list
         db.query(StudyRoom).filter(
             StudyRoom.room_id == leave_data.room_id
         ).update({
@@ -160,7 +157,7 @@ async def leave_study_room(
         
         db.commit()
         
-        # 4. 刷新获取最新数据
+        # 4. Refresh to get latest data
         db.refresh(target_room)
         return target_room
         
@@ -168,10 +165,8 @@ async def leave_study_room(
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"退出自习室失败: {str(e)}"
+            detail=f"Failed to leave study room: {str(e)}"
         )
-
-
 
 @router.get("/{study_room_id}/{study_user_id}/leaderboard")
 async def get_study_room_leaderboard(
@@ -179,15 +174,15 @@ async def get_study_room_leaderboard(
     study_user_id: int,
     db: Session = Depends(get_db)
 ):
-    # 1. 验证自习室存在
+    # 1. Validate study room exists
     study_room = db.query(StudyRoom).get(study_room_id)
     if not study_room:
-        raise HTTPException(status_code=404, detail="自习室不存在")
+        raise HTTPException(status_code=404, detail="Study room not found")
 
-    # 2. 获取所有成员及其今日专注时间
+    # 2. Get all members and their focus time today
     today = date.today()
 
-    # 明确指定 select_from(User)，避免多来源冲突
+    # Explicitly specify select_from(User) to avoid multiple source conflicts
     members = db.query(
         User.user_id,
         User.user_name.label("name"),
@@ -205,7 +200,7 @@ async def get_study_room_leaderboard(
         func.coalesce(DailyStatistics.duration_day, 0).desc()
     ).all()
 
-    # 3. 生成密集排名
+    # 3. Generate dense ranking
     ranked_members = []
     current_user_info = None
     if not members:
@@ -233,7 +228,6 @@ async def get_study_room_leaderboard(
     ).first()
     room_des=target_room.room_description
         
-
     return {
         "room_description":room_des,
         "leaderboard": ranked_members,
@@ -241,15 +235,15 @@ async def get_study_room_leaderboard(
     }
 
 def update_user_study_room_id(db: Session):
-    """更新所有用户的study_room_id"""
+    """Update study_room_id for all users"""
     try:
-        # 获取所有自习室
+        # Get all study rooms
         study_rooms = db.query(StudyRoom).all()
         
-        # 遍历每个自习室
+        # Iterate through each study room
         for room in study_rooms:
             if room.members_list:
-                # 更新该自习室所有成员的study_room_id
+                # Update study_room_id for all members of this room
                 db.query(User).filter(
                     User.user_id.in_(room.members_list)
                 ).update({
@@ -257,17 +251,17 @@ def update_user_study_room_id(db: Session):
                 })
         
         db.commit()
-        return {"message": "用户自习室ID更新成功"}
+        return {"message": "User study room IDs updated successfully"}
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"更新用户自习室ID失败: {str(e)}"
+            detail=f"Failed to update user study room IDs: {str(e)}"
         )
 
 @router.post("/update_user_rooms")
 async def update_user_rooms(
     db: Session = Depends(get_db)
 ):
-    """更新所有用户的study_room_id"""
+    """Update study_room_id for all users"""
     return update_user_study_room_id(db)

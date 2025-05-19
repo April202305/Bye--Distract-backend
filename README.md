@@ -1,108 +1,119 @@
-# 自习室管理系统
+# Pomodoro Timer Backend
 
-这是一个基于FastAPI开发的自习室管理系统，提供用户管理、任务管理和自习室管理等功能。
+A robust backend system for managing Pomodoro timer sessions, built with FastAPI. This system provides comprehensive functionality for tracking work sessions, managing tasks, and monitoring productivity.
 
-## 功能特性
+## Features
 
-### 用户管理
-- 用户注册和登录
-- 用户信息管理
-- 用户认证和授权
+### Timer Management
+- Create and manage Pomodoro sessions
+- Support for both countdown and count-up timers
+- Customizable work/break intervals
+- Session statistics and history
 
-### 自习室管理
-- 创建自习室
-- 加入自习室
-- 自习室成员管理
-- 自习室信息展示
+### Task Management
+- Create and organize tasks
+- Track task completion status
+- Task abandonment handling
+- Task categorization and prioritization
 
-### 任务管理
-- 创建学习任务
-- 任务计时功能（正计时/倒计时）
-- 任务完成状态追踪
-- 任务放弃功能
+### User Management
+- User registration and authentication
+- User profile management
+- Session history per user
+- Productivity analytics
 
-## 技术栈
+## Tech Stack
 
-- **后端框架**: FastAPI
-- **数据库**: SQLAlchemy (ORM)
-- **数据库迁移**: Alembic
-- **认证**: JWT (JSON Web Tokens)
-- **API文档**: Swagger UI (自动生成)
+- **Backend Framework**: FastAPI
+- **Database**: SQLAlchemy (ORM)
+- **Database Migration**: Alembic
+- **Authentication**: JWT (JSON Web Tokens)
+- **API Documentation**: Swagger UI (Auto-generated)
 
-## 项目结构
+## Project Structure
 
 ```
 app/
-├── api/            # API路由和端点
-├── models/         # 数据库模型
-├── schemas/        # Pydantic模型
-├── services/       # 业务逻辑
-├── database/       # 数据库配置
-└── main.py         # 应用入口
+├── api/            # API routes and endpoints
+├── models/         # Database models
+├── schemas/        # Pydantic models
+├── services/       # Business logic
+├── database/       # Database configuration
+└── main.py         # Application entry point
 ```
 
-## 安装说明
+## Installation
 
-1. 克隆项目
+1. Clone the repository
 ```powershell
-git clone [项目地址]
-cd [项目目录]
+git clone [https://github.com/April202305/Bye--Distract-backend]
+cd [project-directory]
 ```
 
-2. 创建虚拟环境
+2. Create virtual environment
 ```powershell
 python -m venv myenv
 .\myenv\Scripts\activate
 ```
 
-3. 安装依赖
+3. Install dependencies
 ```powershell
 pip install -r requirements.txt
 ```
 
-4. 初始化数据库
+4. Initialize database
 ```powershell
 alembic upgrade head
 ```
 
-5. 运行应用
+5. Run the application
 ```powershell
 python -m app.main
 ```
 
-## API文档
+## API Documentation
 
-启动应用后，访问以下地址查看API文档：
+Once the application is running, access the API documentation at:
 - Swagger UI: http://localhost:8001/docs
 - ReDoc: http://localhost:8001/redoc
 
-## 主要API端点
+## Key API Endpoints
 
-### 用户相关
-- POST /users/register - 用户注册
-- POST /users/login - 用户登录
-- GET /users/me - 获取当前用户信息
+### Timer Related
+- POST /timer/start - Start a new Pomodoro session
+- GET /timer/status - Get current timer status
+- POST /timer/pause - Pause current session
+- POST /timer/resume - Resume paused session
+- POST /timer/stop - Stop current session
 
-### 自习室相关
-- POST /study_room/add - 创建自习室
-- POST /study_room/join - 加入自习室
+### Task Related
+- POST /tasks - Create a new task
+- GET /tasks - List all tasks
+- PUT /tasks/{task_id} - Update task status
+- DELETE /tasks/{task_id} - Delete a task
 
-### 任务相关
-- POST /tasks - 创建任务
-- GET /tasks - 获取任务列表
-- PUT /tasks/{task_id} - 更新任务状态
+### User Related
+- POST /users/register - Register new user
+- POST /users/login - User login
+- GET /users/me - Get current user info
 
-## 开发说明
+## Development Notes
 
-- 使用FastAPI框架开发RESTful API
-- 采用SQLAlchemy作为ORM工具
-- 使用Alembic进行数据库迁移
-- 实现了完整的错误处理机制
-- 支持异步操作
+- Built with FastAPI for high performance
+- Uses SQLAlchemy for database operations
+- Implements comprehensive error handling
+- Supports asynchronous operations
+- Includes detailed logging for debugging
 
-## 注意事项
+## Requirements
 
-- 确保数据库配置正确
-- 运行前需要激活虚拟环境
-- 首次运行需要执行数据库迁移
-- 建议使用Python 3.8+版本 
+- Python 3.8+
+- PostgreSQL (or your preferred database)
+- Virtual environment (recommended)
+
+## Notes
+
+- Ensure proper database configuration
+- Activate virtual environment before running
+- Execute database migrations on first run
+- Check logs for debugging information 

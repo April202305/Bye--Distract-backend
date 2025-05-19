@@ -8,7 +8,7 @@ from datetime import datetime
 
 router = APIRouter()
 
-# 数据库依赖
+# Database dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -18,12 +18,12 @@ def get_db():
 
 @router.post("/register", response_model=UserResponse)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
-    # 检查邮箱是否已存在
+    # Check if email already exists
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # 创建新用户
+    # Create new user
     hashed_password = get_password_hash(user.password)
     db_user = User(
         user_name=user.user_name,
@@ -37,7 +37,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 async def login(user: UserLogin, db: Session = Depends(get_db)):
-    # 验证用户
+    # Verify user
     db_user = db.query(User).filter(User.email == user.email).first()
     if not db_user or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(
@@ -45,7 +45,7 @@ async def login(user: UserLogin, db: Session = Depends(get_db)):
             detail="Incorrect email or password"
         )
     
-    # 更新最后登录时间
+    # Update last login time
     db_user.last_login = datetime.utcnow()
     db.commit()
     
