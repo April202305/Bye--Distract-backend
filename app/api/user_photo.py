@@ -115,14 +115,13 @@ async def upload_photo(
     user_id: int = None,
     db: Session = Depends(get_db)
 ):
-    """上传用户照片"""
     temp_path = None
     try:
         # Validate file type
         if not photo.content_type.startswith('image/'):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="只支持图片文件上传"
+                detail="only support image"
             )
         
         # Validate file size (限制为5MB)
@@ -130,9 +129,9 @@ async def upload_photo(
         if len(content) > 5 * 1024 * 1024:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="文件大小不能超过5MB"
+                detail="file not bigger than 5MB"
             )
-        await photo.seek(0)  # 重置文件指针
+        await photo.seek(0)  
         
         # Check if user exists
         if user_id:
@@ -140,7 +139,7 @@ async def upload_photo(
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="用户不存在"
+                    detail="User not found"
                 )
         
         # Generate unique object name
@@ -183,53 +182,109 @@ async def upload_photo(
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
 
-@router.delete("/{user_id}")
-async def delete_photo(
-    user_id: int,
+# @router.delete("/{user_id}")
+# async def delete_photo(
+#     user_id: int,
+#     db: Session = Depends(get_db)
+# ):
+#     """Delete user photo"""
+#     try:
+#         user = db.query(User).filter(User.user_id == user_id).first()
+#         if not user:
+#             raise HTTPException(
+#                 status_code=status.HTTP_404_NOT_FOUND,
+#                 detail="User not found"
+#             )
+        
+#         if not user.avatar_url:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="User has no photo"
+#             )
+        
+#         # Extract object name from URL
+#         object_name = user.avatar_url.split(f"{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/")[-1]
+        
+#         # Delete file from OSS
+#         auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
+#         bucket = oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
+#         bucket.delete_object(object_name)
+        
+#         # Update user avatar URL
+#         user.avatar_url = None
+#         db.commit()
+        
+#         return JSONResponse(
+#             status_code=status.HTTP_200_OK,
+#             content={
+#                 "status": "success",
+#                 "message": "Photo deleted successfully"
+#             }
+#         )
+        
+#     except HTTPException as he:
+#         raise he
+#     except Exception as e:
+#         return JSONResponse(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             content={
+#                 "status": "error",
+#                 "message": f"Delete failed: {str(e)}"
+#             }
+#         )
+    
+
+@router.post("/")
+async def get_user_avatars(
+    user_ids: str,  # Receive comma-separated user ID string
     db: Session = Depends(get_db)
 ):
-    """删除用户照片"""
+    """Get user avatar URLs in batch
+    
+    Args:
+        user_ids: Comma-separated user ID string, e.g. "1,2,3"
+    """
     try:
-        user = db.query(User).filter(User.user_id == user_id).first()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="user not found"
-            )
+        # Convert string to integer list
+        id_list = [int(id_str.strip()) for id_str in user_ids.split(',') if id_str.strip()]
         
-        if not user.avatar_url:
+        if not id_list:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="user not has photo"
+                detail="Please provide valid user ID list"
             )
         
-        # Extract object name from URL
-        object_name = user.avatar_url.split(f"{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/")[-1]
+        # Query user avatar URLs
+        users = db.query(User).filter(
+            User.user_id.in_(id_list)
+        ).all()
         
-        # Delete file from OSS
-        auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
-        bucket = oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
-        bucket.delete_object(object_name)
+        # Build response data
+        avatar_dict = {user.user_id: user.avatar_url for user in users}
         
-        # Update user avatar URL
-        user.avatar_url = None
-        db.commit()
+        # Ensure all requested user IDs are returned, return null for those without avatars
+        result = {
+            str(user_id): avatar_dict.get(user_id) for user_id in id_list
+        }
         
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
                 "status": "success",
-                "message": "Photo deleted successfully"
+                "data": result
             }
         )
         
-    except HTTPException as he:
-        raise he
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user ID format"
+        )
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "status": "error",
-                "message": f"Delete failed: {str(e)}"
+                "message": f"Failed to get avatars: {str(e)}"
             }
-        )
+        )     
